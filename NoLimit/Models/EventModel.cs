@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.Json.Serialization;
 
-namespace NoLimit.Logging
+namespace NoLimit.Models
 {
     public class EventModel
     {

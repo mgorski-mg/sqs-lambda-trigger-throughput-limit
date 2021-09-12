@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Testing.Logging;
+using Testing.Models;
 using Xunit;
 
 namespace Testing

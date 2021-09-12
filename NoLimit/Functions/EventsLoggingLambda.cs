@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Amazon.Lambda.SQSEvents;
-using NoLimit.Logging;
+using NoLimit.Models;
 
 namespace NoLimit.Functions
 {

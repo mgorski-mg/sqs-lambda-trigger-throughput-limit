@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.Json.Serialization;
 
-namespace ThroughputLimit.Logging
+namespace Throttling.Models
 {
     public class EventModel
     {

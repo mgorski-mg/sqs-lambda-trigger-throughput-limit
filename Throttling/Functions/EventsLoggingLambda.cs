@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Amazon.Lambda.SQSEvents;
-using Throttling.Logging;
+using Throttling.Models;
 
 namespace Throttling.Functions
 {

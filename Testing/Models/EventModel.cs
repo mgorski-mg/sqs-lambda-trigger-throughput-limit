@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.Json.Serialization;
 
-namespace Testing.Logging
+namespace Testing.Models
 {
     public class EventModel
     {
