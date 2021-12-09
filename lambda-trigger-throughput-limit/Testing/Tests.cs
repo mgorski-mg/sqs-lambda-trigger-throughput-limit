@@ -24,7 +24,7 @@ namespace Testing
         [Fact]
         public void ThrottlingTest()
         {
-            const int numberOfEvents = 100;
+            const int numberOfEvents = 1000;
             const bool isFifo = false;
             const string queueUrl = "";
 
@@ -49,7 +49,7 @@ namespace Testing
 
             for (var i = 0; i < numberOfEvents; i++)
             {
-                tasks.Add( sqsClient.SendMessageAsync(requests[i]));
+                tasks.Add(sqsClient.SendMessageAsync(requests[i]));
                 if (i % 500 == 0)
                 {
                     Task.WaitAll(tasks.ToArray());
