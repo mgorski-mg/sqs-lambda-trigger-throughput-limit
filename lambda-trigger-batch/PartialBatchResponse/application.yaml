@@ -1,0 +1,143 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  EventsLoggingLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: PartialBatchResponse::PartialBatchResponse.Functions.EventsLoggingLambda::InvokeAsync
+      Role: !GetAtt EventsLoggingLambdaRole.Arn
+
+  EventsQueueLoggingLambdaSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt EventsQueue.Arn
+      FunctionName: !GetAtt EventsLoggingLambda.Arn
+      BatchSize: 100
+      MaximumBatchingWindowInSeconds: 5
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+
+  EventsLoggingLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: allowToUseSqs
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt EventsQueue.Arn
+        - PolicyName: allowToUseKms
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: !GetAtt KmsKey.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+
+  EventsLoggingLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${EventsLoggingLambda}
+      RetentionInDays: 30
+
+  EventsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      VisibilityTimeout: 65 # 6 x Lambda Timeout + MaximumBatchingWindowInSeconds
+      KmsMasterKeyId: !GetAtt KmsKey.Arn
+      KmsDataKeyReusePeriodSeconds: 86400 # 24h
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EventsDeadLetterQueue.Arn
+        maxReceiveCount: 1
+
+  EventsDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      KmsMasterKeyId: !GetAtt KmsKey.Arn
+      KmsDataKeyReusePeriodSeconds: 86400 # 24h
+
+  EventsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref EventsQueue
+      PolicyDocument:
+        Id: !Sub ${AWS::StackName}-events-queue-policy
+        Version: 2012-10-17
+        Statement:
+          - Sid: Deny receive message
+            Effect: Deny
+            Principal:
+              AWS: '*'
+            Action: sqs:ReceiveMessage
+            Resource: !GetAtt EventsQueue.Arn
+            Condition:
+              StringNotEquals:
+                aws:PrincipalArn: !GetAtt EventsLoggingLambdaRole.Arn
+
+  EventsDeadLetterQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref EventsDeadLetterQueue
+      PolicyDocument:
+        Id: !Sub ${AWS::StackName}-events-dead-letter-queue-policy
+        Version: 2012-10-17
+        Statement:
+          - Sid: Deny send and receive message
+            Effect: Deny
+            Principal:
+              AWS: '*'
+            Action:
+              - sqs:SendMessage
+            Resource: !GetAtt EventsDeadLetterQueue.Arn
+
+  KmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Event Logger KMS Key
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: !Sub ${AWS::StackName}-kms-key
+        Statement:
+          - Sid: Allow all
+            Effect: Allow
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Action:
+              - kms:*
+            Resource: '*'
+
+  KMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName:
+        Fn::Sub: alias/${AWS::StackName}
+      TargetKeyId: !GetAtt KmsKey.Arn
+
+Globals:
+  Function:
+    Runtime: dotnetcore3.1
+    CodeUri: bin/Release/netcoreapp3.1/publish
+    MemorySize: 512
+    Timeout: 10
